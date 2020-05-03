@@ -244,6 +244,8 @@ void Tasks::SendToMonTask(void* arg) {
  */
 void Tasks::ReceiveFromMonTask(void *arg) {
     Message *msgRcv;
+    Message * sentMsg;
+    int closeRobot;
     
     cout << "Start " << __PRETTY_FUNCTION__ << endl << flush;
     // Synchronization barrier (waiting that all tasks are starting)
@@ -260,7 +262,20 @@ void Tasks::ReceiveFromMonTask(void *arg) {
         cout << "Rcv <= " << msgRcv->ToString() << endl << flush;
 
         if (msgRcv->CompareID(MESSAGE_MONITOR_LOST)) {
-            delete(msgRcv);
+            rt_mutex_acquire(&mutex_move, TM_INFINITE);
+            move = MESSAGE_ROBOT_STOP;
+            rt_mutex_release(&mutex_move);
+            closeRobot = ComRobot.Close();
+            while(closeRobot < 0){
+                sentMsg = new Message(MESSAGE_ANSWER_NACK);
+                WriteInQueue(&q_messageToMon, sentMsg);
+                closeRobot = ComRobot.Close();
+            }
+            sentMsg = new Message(MESSAGE_ANSWER_ACK);
+            WriteInQueue(&q_messageToMon, sentMsg);
+            ComMonitor.Close();
+            Camera.Close(); //envoyer un signal ?
+            cout << " Monitor is lost" ;
             exit(-1);
         } else if (msgRcv->CompareID(MESSAGE_ROBOT_COM_OPEN)) {
             rt_sem_v(&sem_openComRobot);
