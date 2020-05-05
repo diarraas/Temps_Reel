@@ -277,8 +277,6 @@ void Tasks::ReceiveFromMonTask(void *arg) {
             rt_sem_v(&sem_closeCam);
             cout << " Monitor is lost" ;
             exit(-1);
-        } else if (msgRcv->CompareID(MESSAGE_ROBOT_BATTERY_GET)) {
-            //Tasks::BatteryTask();
         } else if (msgRcv->CompareID(MESSAGE_CAM_OPEN)) {
             rt_sem_v(&sem_openCam);
         } else if (msgRcv->CompareID(MESSAGE_CAM_CLOSE)) {
@@ -442,10 +440,18 @@ Message *Tasks::ReadInQueue(RT_QUEUE *queue) {
  TODO: Fonctionnalités à implémenter
  */
 
-void BatteryTask(void *arg){
-    rt_task_set_periodic(NULL, TM_NOW, 50000000);
-    Message * level;
+void Tasks::BatteryTask(void *arg){
+    rt_task_set_periodic(NULL, TM_NOW, 500000000);
     cout << "Start" << __PRETTY_FUNCTION__ << endl << flush;
-    level = ComRobot::GetBattery();
-  //  robot.Write(level);
+    Message * level ;
+    while (1) {
+        rt_task_wait_period(NULL);
+        cout << "Periodic battery update";
+        level = ComRobot::GetBattery();
+        rt_mutex_acquire(&mutex_robot, TM_INFINITE);
+        robot.Write(level);
+        rt_mutex_release(&mutex_robot);
+        cout << endl << flush;
+    }
+  
 }
