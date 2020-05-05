@@ -265,22 +265,30 @@ void Tasks::ReceiveFromMonTask(void *arg) {
             rt_mutex_acquire(&mutex_move, TM_INFINITE);
             move = MESSAGE_ROBOT_STOP;
             rt_mutex_release(&mutex_move);
-            closeRobot = ComRobot.Close();
+            closeRobot = robot.Close();
             while(closeRobot < 0){
                 sentMsg = new Message(MESSAGE_ANSWER_NACK);
                 WriteInQueue(&q_messageToMon, sentMsg);
-                closeRobot = ComRobot.Close();
+                closeRobot = robot.Close();
             }
             sentMsg = new Message(MESSAGE_ANSWER_ACK);
             WriteInQueue(&q_messageToMon, sentMsg);
-            ComMonitor.Close();
-            Camera.Close(); //envoyer un signal ?
+            monitor.Close();
+            rt_sem_v(&sem_closeCam);
             cout << " Monitor is lost" ;
             exit(-1);
+        } else if (msgRcv->CompareID(MESSAGE_ROBOT_BATTERY_GET)) {
+            //Tasks::BatteryTask();
+        } else if (msgRcv->CompareID(MESSAGE_CAM_OPEN)) {
+            rt_sem_v(&sem_openCam);
+        } else if (msgRcv->CompareID(MESSAGE_CAM_CLOSE)) {
+            rt_sem_v(&sem_closeCam);
         } else if (msgRcv->CompareID(MESSAGE_ROBOT_COM_OPEN)) {
             rt_sem_v(&sem_openComRobot);
         } else if (msgRcv->CompareID(MESSAGE_ROBOT_START_WITHOUT_WD)) {
             rt_sem_v(&sem_startRobot);
+        } else if (msgRcv->CompareID(MESSAGE_ROBOT_START_WITH_WD)) {
+            rt_sem_v(&sem_startRobotWD);
         } else if (msgRcv->CompareID(MESSAGE_ROBOT_GO_FORWARD) ||
                 msgRcv->CompareID(MESSAGE_ROBOT_GO_BACKWARD) ||
                 msgRcv->CompareID(MESSAGE_ROBOT_GO_LEFT) ||
@@ -435,8 +443,9 @@ Message *Tasks::ReadInQueue(RT_QUEUE *queue) {
  */
 
 void BatteryTask(void *arg){
-    MessageBattery * level;
+    rt_task_set_periodic(NULL, TM_NOW, 50000000);
+    Message * level;
     cout << "Start" << __PRETTY_FUNCTION__ << endl << flush;
     level = ComRobot::GetBattery();
-    ComMonitor::Write(level);
+  //  robot.Write(level);
 }

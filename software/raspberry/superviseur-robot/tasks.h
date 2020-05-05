@@ -93,6 +93,9 @@ private:
     RT_SEM sem_openComRobot;
     RT_SEM sem_serverOk;
     RT_SEM sem_startRobot;
+    RT_SEM sem_startRobotWD;
+    RT_SEM sem_openCam;
+    RT_SEM sem_closeCam;
 
     /**********************************************************************/
     /* Message queues                                                     */
