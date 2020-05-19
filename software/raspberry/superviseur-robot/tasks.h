@@ -66,7 +66,8 @@ private:
     ComRobot robot;
     int robotStarted = 0;
     int move = MESSAGE_ROBOT_STOP;
-    
+    int errorCmpt = 0 ;
+    int openComRobot = 0;
     /**********************************************************************/
     /* Tasks                                                              */
     /**********************************************************************/
@@ -77,6 +78,8 @@ private:
     RT_TASK th_startRobot;
     RT_TASK th_move;
     RT_TASK th_battery;
+    RT_TASK th_gestionComRobot;
+    RT_TASK th_startRobotWD ;
     
     /**********************************************************************/
     /* Mutex                                                              */
@@ -85,6 +88,7 @@ private:
     RT_MUTEX mutex_robot;
     RT_MUTEX mutex_robotStarted;
     RT_MUTEX mutex_move;
+    RT_MUTEX mutex_openComRobot;
 
     /**********************************************************************/
     /* Semaphores                                                         */
@@ -94,8 +98,6 @@ private:
     RT_SEM sem_serverOk;
     RT_SEM sem_startRobot;
     RT_SEM sem_startRobotWD;
-    RT_SEM sem_openCam;
-    RT_SEM sem_closeCam;
 
     /**********************************************************************/
     /* Message queues                                                     */
@@ -135,13 +137,12 @@ private:
      * @brief Thread handling control of the robot.
      */
     void MoveTask(void *arg);
+   
     
-    
-        /**
-     * @brief Thread handling control of the robot.
+    /**
+     * @brief Thread handling battery of the robot.
      */
-    void BatteryTask(void *arg);
-    
+
     /**********************************************************************/
     /* Queue services                                                     */
     /**********************************************************************/
@@ -158,8 +159,16 @@ private:
      * @return Message read
      */
     Message *ReadInQueue(RT_QUEUE *queue);
-
+    
+    
+    void BatteryTask(void *arg);
+    
+   // void GestionRobotComTask(void *arg) ;
+    
+    void StartRobotWDTask(void *arg) ;
 };
 
-#endif // __TASKS_H__ 
 
+    
+
+#endif // __TASKS_H__ 
