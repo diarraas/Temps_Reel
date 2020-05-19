@@ -68,6 +68,7 @@ private:
     int move = MESSAGE_ROBOT_STOP;
     int errorCmpt = 0 ;
     int openComRobot = 0;
+    int modeWD = 0 ;
     /**********************************************************************/
     /* Tasks                                                              */
     /**********************************************************************/
@@ -79,7 +80,6 @@ private:
     RT_TASK th_move;
     RT_TASK th_battery;
     RT_TASK th_gestionComRobot;
-    RT_TASK th_startRobotWD ;
     
     /**********************************************************************/
     /* Mutex                                                              */
@@ -89,7 +89,7 @@ private:
     RT_MUTEX mutex_robotStarted;
     RT_MUTEX mutex_move;
     RT_MUTEX mutex_openComRobot;
-
+    RT_MUTEX mutex_modeWD;
     /**********************************************************************/
     /* Semaphores                                                         */
     /**********************************************************************/
