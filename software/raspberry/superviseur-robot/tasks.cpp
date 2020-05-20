@@ -22,13 +22,12 @@
 #define PRIORITY_TSERVER 30
 #define PRIORITY_TOPENCOMROBOT 20
 #define PRIORITY_TMOVE 20
-#define PRIORITY_TBATTERY 18
 #define PRIORITY_TSENDTOMON 22
 #define PRIORITY_TRECEIVEFROMMON 25
 #define PRIORITY_TSTARTROBOT 20
 #define PRIORITY_TCAMERA 21
-#define PRIORITY_TWATCHDOG 20
-#define PRIORITY_COMROBOT 19
+#define PRIORITY_TBATTERY 19
+
 
 /*
  * Some remarks:
@@ -110,7 +109,7 @@ void Tasks::Init() {
     /**************************************************************************************/
     /* Tasks creation                                                                     */
     /**************************************************************************************/
-    if (err = rt_task_create(&th_server, "th_server", 0, PRIORITY_TSERVER, 0)) {
+     if (err = rt_task_create(&th_server, "th_server", 0, PRIORITY_TSERVER, 0)) {
         cerr << "Error task create: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);
     }
@@ -130,6 +129,10 @@ void Tasks::Init() {
         cerr << "Error task create: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);
     }
+    /*if (err = rt_task_create(&th_startRobotWD, "th_startRobotWD", 0, PRIORITY_TSTARTROBOT, 0)) {
+        cerr << "Error task create: " << strerror(-err) << endl << flush;
+        exit(EXIT_FAILURE);
+    }*/
     if (err = rt_task_create(&th_move, "th_move", 0, PRIORITY_TMOVE, 0)) {
         cerr << "Error task create: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);
@@ -179,6 +182,10 @@ void Tasks::Run() {
         cerr << "Error task start: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);
     }
+   /* if (err = rt_task_start(&th_startRobotWD, (void(*)(void*)) & Tasks::StartRobotWDTask, this)) {
+        cerr << "Error task start: " << strerror(-err) << endl << flush;
+        exit(EXIT_FAILURE);
+    }*/
     if (err = rt_task_start(&th_move, (void(*)(void*)) & Tasks::MoveTask, this)) {
         cerr << "Error task start: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);
@@ -263,8 +270,6 @@ void Tasks::SendToMonTask(void* arg) {
  */
 void Tasks::ReceiveFromMonTask(void *arg) {
     Message *msgRcv;
-    Message * sentMsg;
-    int closeRobot;
     
     cout << "Start " << __PRETTY_FUNCTION__ << endl << flush;
     // Synchronization barrier (waiting that all tasks are starting)
@@ -273,30 +278,16 @@ void Tasks::ReceiveFromMonTask(void *arg) {
     /**************************************************************************************/
     /* The task receiveFromMon starts here                                                */
     /**************************************************************************************/
+    rt_sem_p(&sem_serverOk, TM_INFINITE);
     cout << "Received message from monitor activated" << endl << flush;
 
     while (1) {
-        rt_sem_p(&sem_serverOk, TM_INFINITE);
         msgRcv = monitor.Read();
         cout << "Rcv <= " << msgRcv->ToString() << endl << flush;
 
-         if (msgRcv->CompareID(MESSAGE_MONITOR_LOST)) {
-            rt_mutex_acquire(&mutex_move, TM_INFINITE);
-            move = MESSAGE_ROBOT_STOP;
-            rt_mutex_release(&mutex_move);
-            closeRobot = robot.Close();
-            while(closeRobot < 0){
-                sentMsg = new Message(MESSAGE_ANSWER_NACK);
-                WriteInQueue(&q_messageToMon, sentMsg);
-                rt_mutex_acquire(&mutex_robot, TM_INFINITE);
-                closeRobot = robot.Close();
-                rt_mutex_release(&mutex_robot);
-            }
-            
-            sentMsg = new Message(MESSAGE_ANSWER_ACK);
-            WriteInQueue(&q_messageToMon, sentMsg);
-            monitor.Close();
-            cout << " Monitor is lost" << endl << flush;
+        if (msgRcv->CompareID(MESSAGE_MONITOR_LOST)) {
+            delete(msgRcv);
+            exit(-1);
         } else if (msgRcv->CompareID(MESSAGE_ROBOT_COM_OPEN)) {
             rt_sem_v(&sem_openComRobot);
         } else if (msgRcv->CompareID(MESSAGE_ROBOT_START_WITHOUT_WD)) {
@@ -314,7 +305,6 @@ void Tasks::ReceiveFromMonTask(void *arg) {
         delete(msgRcv); // mus be deleted manually, no consumer
     }
 }
-
 /**
  * @brief Thread opening communication with the robot.
  */
@@ -335,9 +325,6 @@ void Tasks::OpenComRobot(void *arg) {
         rt_mutex_acquire(&mutex_robot, TM_INFINITE);
         status = robot.Open();
         rt_mutex_release(&mutex_robot);
-        rt_mutex_acquire(&mutex_openComRobot, TM_INFINITE);
-        openComRobot = status;
-        rt_mutex_release(&mutex_openComRobot);
         cout << status;
         cout << ")" << endl << flush;
 
@@ -493,5 +480,6 @@ void Tasks::BatteryTask(void *arg){
     }
   
 }
+
 //demander prio threads
 //demander mutex threads ---> lookup for any mutex use and the functions they call to know when to use them
