@@ -79,6 +79,10 @@ void Tasks::Init() {
         cerr << "Error mutex create: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);
     }
+    if (err = rt_mutex_create(&mutex_openComMonitor, NULL)) {
+        cerr << "Error mutex create: " << strerror(-err) << endl << flush;
+        exit(EXIT_FAILURE);
+    }
     if (err = rt_mutex_create(&mutex_modeWD, NULL)) {
         cerr << "Error mutex create: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);
@@ -229,6 +233,9 @@ void Tasks::ServerTask(void *arg) {
     };
     monitor.AcceptClient(); // Wait the monitor client
     cout << "Rock'n'Roll baby, client accepted!" << endl << flush;
+    rt_mutex_acquire(&mutex_openComMonitor, TM_INFINITE);
+    openComMonitor = 1 ;
+    rt_mutex_release(&mutex_openComMonitor);
     rt_sem_broadcast(&sem_serverOk);
 }
 
@@ -246,14 +253,20 @@ void Tasks::SendToMonTask(void* arg) {
     /* The task sendToMon starts here                                                     */
     /**************************************************************************************/
     rt_sem_p(&sem_serverOk, TM_INFINITE);
-
+    int openCom ;
     while (1) {
-        cout << "wait msg to send" << endl << flush;
-        msg = ReadInQueue(&q_messageToMon);
-        cout << "Send msg to mon: " << msg->ToString() << endl << flush;
-        rt_mutex_acquire(&mutex_monitor, TM_INFINITE);
-        monitor.Write(msg); // The message is deleted with the Write
-        rt_mutex_release(&mutex_monitor);
+        rt_mutex_acquire(&mutex_openComMonitor, TM_INFINITE);
+        openCom = openComMonitor ;
+        rt_mutex_release(&mutex_openComMonitor);
+        if(openCom == 1){
+            cout << "wait msg to send" << endl << flush;
+            msg = ReadInQueue(&q_messageToMon);
+            cout << "Send msg to mon: " << msg->ToString() << endl << flush;
+            rt_mutex_acquire(&mutex_monitor, TM_INFINITE);
+            monitor.Write(msg); // The message is deleted with the Write
+            rt_mutex_release(&mutex_monitor);
+         }
+        
     }
 }
 
@@ -272,37 +285,80 @@ void Tasks::ReceiveFromMonTask(void *arg) {
     /**************************************************************************************/
     rt_sem_p(&sem_serverOk, TM_INFINITE);
     cout << "Received message from monitor activated" << endl << flush;
-
+    int closeRobot ;
+    int openCom;
     while (1) {
-        msgRcv = monitor.Read();
-        cout << "Rcv <= " << msgRcv->ToString() << endl << flush;
+        rt_mutex_acquire(&mutex_openComMonitor, TM_INFINITE);
+        openCom = openComMonitor ;
+        rt_mutex_release(&mutex_openComMonitor);
+        while(openCom == 1){
+            cout << "MONITOR IS OPEN"<< endl << flush;
+            msgRcv = monitor.Read();
+            cout << "Rcv <= " << msgRcv->ToString() << endl << flush;
+            if (msgRcv->CompareID(MESSAGE_MONITOR_LOST)) {
+                rt_mutex_acquire(&mutex_move, TM_INFINITE);
+                move = MESSAGE_ROBOT_STOP;
+                rt_mutex_release(&mutex_move);
+                
+                rt_mutex_acquire(&mutex_robot, TM_INFINITE);
+                closeRobot = robot.Close();
+                rt_mutex_release(&mutex_robot);
+                while(closeRobot < 0){
+                    WriteInQueue(&q_messageToMon, new Message(MESSAGE_ANSWER_NACK));
+                    rt_mutex_acquire(&mutex_robot, TM_INFINITE);
+                    closeRobot = robot.Close();
+                    rt_mutex_release(&mutex_robot);
+                }
 
-        if (msgRcv->CompareID(MESSAGE_MONITOR_LOST)) {
-            delete(msgRcv);
-            exit(-1);
-        } else if (msgRcv->CompareID(MESSAGE_ROBOT_COM_OPEN)) {
-            rt_sem_v(&sem_openComRobot);
-        } else if (msgRcv->CompareID(MESSAGE_ROBOT_START_WITHOUT_WD)) {
-            rt_mutex_acquire(&mutex_modeWD, TM_INFINITE);
-            modeWD = 0 ;
-            rt_mutex_release(&mutex_modeWD);
-            rt_sem_v(&sem_startRobot);
-        } else if (msgRcv->CompareID(MESSAGE_ROBOT_START_WITH_WD)) {
-            rt_mutex_acquire(&mutex_modeWD, TM_INFINITE);
-            modeWD = 1 ;
-            rt_mutex_release(&mutex_modeWD);
-            rt_sem_v(&sem_startRobot);
-        } else if (msgRcv->CompareID(MESSAGE_ROBOT_GO_FORWARD) ||
-                msgRcv->CompareID(MESSAGE_ROBOT_GO_BACKWARD) ||
-                msgRcv->CompareID(MESSAGE_ROBOT_GO_LEFT) ||
-                msgRcv->CompareID(MESSAGE_ROBOT_GO_RIGHT) ||
-                msgRcv->CompareID(MESSAGE_ROBOT_STOP)) {
+                WriteInQueue(&q_messageToMon, new Message(MESSAGE_ANSWER_ACK));
+                monitor.Close();
 
-            rt_mutex_acquire(&mutex_move, TM_INFINITE);
-            move = msgRcv->GetID();
-            rt_mutex_release(&mutex_move);
+                rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
+                robotStarted = 0;
+                rt_mutex_release(&mutex_robotStarted);
+
+                rt_mutex_acquire(&mutex_errorCmpt, TM_INFINITE);
+                errorCmpt = 0;
+                rt_mutex_release(&mutex_errorCmpt);
+
+                rt_mutex_acquire(&mutex_openComRobot, TM_INFINITE);
+                openComRobot = 0;
+                rt_mutex_release(&mutex_openComRobot);
+
+                rt_mutex_acquire(&mutex_modeWD, TM_INFINITE);
+                modeWD = 0;
+                rt_mutex_release(&mutex_modeWD);
+                
+                rt_mutex_acquire(&mutex_openComMonitor, TM_INFINITE);
+                openComMonitor = 0 ;
+                rt_mutex_release(&mutex_openComMonitor);
+                openCom = 0 ;
+
+                cout << " Monitor is lost" << endl << flush;
+            } else if (msgRcv->CompareID(MESSAGE_ROBOT_COM_OPEN)) {
+                rt_sem_v(&sem_openComRobot);
+            } else if (msgRcv->CompareID(MESSAGE_ROBOT_START_WITHOUT_WD)) {
+                rt_mutex_acquire(&mutex_modeWD, TM_INFINITE);
+                modeWD = 0 ;
+                rt_mutex_release(&mutex_modeWD);
+                rt_sem_v(&sem_startRobot);
+            } else if (msgRcv->CompareID(MESSAGE_ROBOT_START_WITH_WD)) {
+                rt_mutex_acquire(&mutex_modeWD, TM_INFINITE);
+                modeWD = 1 ;
+                rt_mutex_release(&mutex_modeWD);
+                rt_sem_v(&sem_startRobot);
+            } else if (msgRcv->CompareID(MESSAGE_ROBOT_GO_FORWARD) ||
+                    msgRcv->CompareID(MESSAGE_ROBOT_GO_BACKWARD) ||
+                    msgRcv->CompareID(MESSAGE_ROBOT_GO_LEFT) ||
+                    msgRcv->CompareID(MESSAGE_ROBOT_GO_RIGHT) ||
+                    msgRcv->CompareID(MESSAGE_ROBOT_STOP)) {
+
+                rt_mutex_acquire(&mutex_move, TM_INFINITE);
+                move = msgRcv->GetID();
+                rt_mutex_release(&mutex_move);
+            }
+            delete(msgRcv); // mus be deleted manually, no consumer
         }
-        delete(msgRcv); // mus be deleted manually, no consumer
     }
 }
 /**
@@ -361,7 +417,7 @@ void Tasks::StartRobotTask(void *arg) {
 
         Message * msgSend;
         rt_sem_p(&sem_startRobot, TM_INFINITE);
-         rt_mutex_acquire(&mutex_modeWD, TM_INFINITE);
+        rt_mutex_acquire(&mutex_modeWD, TM_INFINITE);
         wd = modeWD;
         rt_mutex_release(&mutex_modeWD);
         if(wd == 0){
@@ -396,7 +452,7 @@ void Tasks::StartRobotTask(void *arg) {
                 if(cmpt == 3){
                     cout << "COM LOST "<<endl<<flush;
                     rt_mutex_acquire(&mutex_monitor, TM_INFINITE);
-                    monitor.Write(new Message(MESSAGE_MONITOR_LOST));
+                    monitor.Write(new Message(MESSAGE_ANSWER_COM_ERROR));
                     rt_mutex_release(&mutex_monitor);
                 }
         }
@@ -425,7 +481,7 @@ void Tasks::StartRobotTask(void *arg) {
             if(cptWD == 3){
                 cout << "COM LOST" << endl << flush;
                 rt_mutex_acquire(&mutex_monitor, TM_INFINITE);
-                monitor.Write(new Message(MESSAGE_MONITOR_LOST));
+                monitor.Write(new Message(MESSAGE_ANSWER_COM_ERROR));
                 rt_mutex_release(&mutex_monitor);
                 
             }
@@ -481,7 +537,7 @@ void Tasks::MoveTask(void *arg) {
                 if(cmpt == 3){
                     cout << "COM LOST "<<endl<<flush;
                     rt_mutex_acquire(&mutex_monitor, TM_INFINITE);
-                    monitor.Write(new Message(MESSAGE_MONITOR_LOST));
+                    monitor.Write(new Message(MESSAGE_ANSWER_COM_ERROR));
                     rt_mutex_release(&mutex_monitor);
                 }
             }else{
@@ -560,7 +616,7 @@ void Tasks::BatteryTask(void *arg){
                 if(cmpt == 3){
                     cout << "COM LOSTT "<<endl<<flush;
                     rt_mutex_acquire(&mutex_monitor, TM_INFINITE);
-                    monitor.Write(new Message(MESSAGE_MONITOR_LOST));
+                    monitor.Write(new Message(MESSAGE_ANSWER_COM_ERROR));
                     rt_mutex_release(&mutex_monitor);
                 }
             }else{

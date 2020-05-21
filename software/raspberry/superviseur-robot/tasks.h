@@ -69,6 +69,7 @@ private:
     int errorCmpt = 0 ;
     int openComRobot = 0;
     int modeWD = 0 ;
+    int openComMonitor = 0;
     /**********************************************************************/
     /* Tasks                                                              */
     /**********************************************************************/
@@ -90,6 +91,7 @@ private:
     RT_MUTEX mutex_openComRobot;
     RT_MUTEX mutex_modeWD;
     RT_MUTEX mutex_errorCmpt;
+    RT_MUTEX mutex_openComMonitor;
     /**********************************************************************/
     /* Semaphores                                                         */
     /**********************************************************************/
