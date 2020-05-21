@@ -77,11 +77,8 @@ private:
     RT_TASK th_receiveFromMon;
     RT_TASK th_openComRobot;
     RT_TASK th_startRobot;
-        RT_TASK th_startRobotWD;
-
     RT_TASK th_move;
     RT_TASK th_battery;
-    RT_TASK th_gestionComRobot;
     
     /**********************************************************************/
     /* Mutex                                                              */
@@ -92,6 +89,7 @@ private:
     RT_MUTEX mutex_move;
     RT_MUTEX mutex_openComRobot;
     RT_MUTEX mutex_modeWD;
+    RT_MUTEX mutex_errorCmpt;
     /**********************************************************************/
     /* Semaphores                                                         */
     /**********************************************************************/
@@ -168,6 +166,10 @@ private:
    // void GestionRobotComTask(void *arg) ;
     
     void StartRobotWDTask(void *arg) ;
+    
+    void GestionRobotComTask(void *arg) ;
+
+    
 };
 
 
