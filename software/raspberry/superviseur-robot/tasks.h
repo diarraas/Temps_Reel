@@ -80,6 +80,7 @@ private:
     RT_TASK th_startRobot;
     RT_TASK th_move;
     RT_TASK th_battery;
+    RT_TASK th_kill;
     
     /**********************************************************************/
     /* Mutex                                                              */
@@ -99,7 +100,8 @@ private:
     RT_SEM sem_openComRobot;
     RT_SEM sem_serverOk;
     RT_SEM sem_startRobot;
-    RT_SEM sem_startRobotWD;
+    RT_SEM sem_kill;
+    
 
     /**********************************************************************/
     /* Message queues                                                     */
@@ -167,10 +169,8 @@ private:
     
    // void GestionRobotComTask(void *arg) ;
     
-    void StartRobotWDTask(void *arg) ;
+    void Kill(void *arg) ;
     
-    void GestionRobotComTask(void *arg) ;
-
     
 };
 
