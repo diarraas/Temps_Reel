@@ -58,6 +58,8 @@ public:
      */
     void Join();
     
+
+    
 private:
     /**********************************************************************/
     /* Shared data                                                        */
@@ -70,6 +72,9 @@ private:
     int openComRobot = 0;
     int modeWD = 0 ;
     int openComMonitor = 0;
+    int readySend = 0 ;
+    int readyRcv = 0 ;
+
     /**********************************************************************/
     /* Tasks                                                              */
     /**********************************************************************/
@@ -80,7 +85,7 @@ private:
     RT_TASK th_startRobot;
     RT_TASK th_move;
     RT_TASK th_battery;
-    RT_TASK th_kill;
+    RT_TASK th_killServer;
     
     /**********************************************************************/
     /* Mutex                                                              */
@@ -92,7 +97,7 @@ private:
     RT_MUTEX mutex_openComRobot;
     RT_MUTEX mutex_modeWD;
     RT_MUTEX mutex_errorCmpt;
-    RT_MUTEX mutex_openComMonitor;
+
     /**********************************************************************/
     /* Semaphores                                                         */
     /**********************************************************************/
@@ -169,7 +174,7 @@ private:
     
    // void GestionRobotComTask(void *arg) ;
     
-    void Kill(void *arg) ;
+    void KillServerTask(void *arg) ;
     
     
 };
